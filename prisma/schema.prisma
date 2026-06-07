@@ -1,0 +1,79 @@
+// This schema is for production deployment with Neon PostgreSQL.
+// For local development, the app uses sql.js (pure-JS SQLite) to avoid
+// binary downloads. Swap lib/db.ts for the Prisma client in production.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Level {
+  L3
+  L4
+  L5
+  L6
+  SDE_I
+  SDE_II
+  SDE_III
+  STAFF
+  PRINCIPAL
+  IC4
+  IC5
+}
+
+enum Currency {
+  INR
+  USD
+  GBP
+  EUR
+}
+
+enum Source {
+  CONTRIBUTOR
+  SCRAPED
+  AI_INFERRED
+}
+
+model Company {
+  id              String   @id @default(uuid())
+  name            String
+  slug            String   @unique
+  normalized_name String
+  industry        String   @default("")
+  headquarters    String   @default("")
+  founded_year    Int?
+  headcount_range String?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+  salaries        Salary[]
+
+  @@index([normalized_name])
+}
+
+model Salary {
+  id                 String   @id @default(uuid())
+  company_id         String
+  company            Company  @relation(fields: [company_id], references: [id])
+  role               String
+  level              Level
+  location           String
+  currency           Currency
+  experience_years   Int
+  base_salary        BigInt
+  bonus              BigInt   @default(0)
+  stock              BigInt   @default(0)
+  total_compensation BigInt   // ALWAYS computed server-side: base + bonus + stock
+  source             Source   @default(CONTRIBUTOR)
+  confidence_score   Decimal  @db.Decimal(4, 3)
+  is_verified        Boolean  @default(false)
+  submitted_at       DateTime @default(now())
+
+  @@index([company_id, level, location])
+  @@index([total_compensation])
+  @@index([submitted_at])
+  @@index([location, level])
+}
